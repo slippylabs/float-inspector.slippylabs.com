@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IEEE 754 Float Inspector // float-inspector.slippylabs.com</title>
+<meta name="description" content="See exactly what a float stores — every bit, the exact decimal value it really holds, the rounding error, the ULP, and the neighbours on either side. Covers binary16, bfloat16, binary32 and binary64. Runs entirely in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://float-inspector.slippylabs.com/">
+<meta property="og:title" content="IEEE 754 Float Inspector // float-inspector.slippylabs.com">
+<meta property="og:description" content="See exactly what a float stores — every bit, the exact decimal value it really holds, the rounding error, the ULP, and the neighbours on either side. Covers binary16, bfloat16, binary32 and binary64. Runs entirely in your browser.">
+<meta property="og:image" content="https://float-inspector.slippylabs.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="IEEE 754 Float Inspector // float-inspector.slippylabs.com">
+<meta name="twitter:description" content="See exactly what a float stores — every bit, the exact decimal value it really holds, the rounding error, the ULP, and the neighbours on either side. Covers binary16, bfloat16, binary32 and binary64. Runs entirely in your browser.">
+<meta name="twitter:image" content="https://float-inspector.slippylabs.com/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2222%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#050b10">
+<link rel="stylesheet" href="style.css?v=1">
+<script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
+(function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="scanlines"></div>
+
+<main class="page-wrap">
+  <div class="hud-panel wide">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="callsign-row">
+      <div class="toad-avatar-wrap">
+        <svg class="toad-avatar" width="46" height="46" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="lock-reticle"></div>
+      </div>
+      <span class="callsign">Workshop Division // Tool</span>
+      <div class="nav-links">
+        <a href="https://projects.slippylabs.com/" class="logout-link">← Archive</a>
+      </div>
+    </div>
+
+
+    <h1>IEEE 754 FLOAT INSPECTOR</h1>
+    <p class="subtitle">Type a number and watch it get rounded. Every value here is computed with exact rational arithmetic in <code>BigInt</code>, so the &ldquo;exact stored value&rdquo; really is exact &mdash; all 751 digits of it when that is what the bits mean.</p>
+
+    <div class="filter-bar" role="tablist" aria-label="Mode">
+      <button class="hud-tab active" data-panel="panel-decode">Number &rarr; Bits</button>
+      <button class="hud-tab" data-panel="panel-bits">Bits &rarr; Number</button>
+      <button class="hud-tab" data-panel="panel-math">Arithmetic Lab</button>
+      <button class="hud-tab" data-panel="panel-limits">Format Limits</button>
+    </div>
+
+    <section id="panel-decode">
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="num-input">Decimal, scientific, hex float, or a special</label>
+        <input class="tool-text-input" id="num-input" type="text" spellcheck="false"
+               autocapitalize="off" autocomplete="off"
+               placeholder="0.1   ·   1/3 as 0.3333333333333333   ·   6.02214076e23   ·   0x1.921fb54442d18p+1   ·   inf   ·   nan">
+      </div>
+      <p class="tool-note" id="num-error" role="alert"></p>
+      <div class="tip-quick-row" id="sample-row"></div>
+
+      <div class="cert-section-label">What each format does with it</div>
+      <div class="net-table-wrap">
+        <table class="net-table" id="cmp-table"></table>
+      </div>
+
+      <div class="tool-controls">
+        <label class="tool-field-label" for="fmt-select" style="margin-right:-4px">Bit view</label>
+        <select class="tool-select" id="fmt-select"></select>
+        <button class="tool-btn ghost" id="prev-btn">&larr; Previous float</button>
+        <button class="tool-btn ghost" id="next-btn">Next float &rarr;</button>
+      </div>
+      <div class="tool-controls">
+        <button class="tool-btn ghost" id="sign-btn">&plusmn; Flip sign</button>
+        <button class="tool-btn ghost" id="expdown-btn">Exponent &minus;1</button>
+        <button class="tool-btn ghost" id="expup-btn">Exponent &plus;1</button>
+      </div>
+      <p class="tool-note">
+        The neighbour buttons step one representable value at a time &mdash; the smallest change this
+        format can express at this magnitude &mdash; and the exponent buttons halve or double it.
+        On a desktop you can also click any bit in the strip to flip it directly; sixty-four bits
+        cannot each be a thumb-sized target on a phone, so there the strip is a readout and these
+        buttons do the editing.
+      </p>
+      <div id="bitview-host"></div>
+      <div class="net-grid" id="detail-host"></div>
+
+      <div class="cert-section-label">Exact stored value</div>
+      <div class="exact-out" id="exact-out"></div>
+      <p class="tool-note" id="exact-note"></p>
+    </section>
+
+    <section id="panel-bits" class="hidden">
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="bits-input">Hex or binary bit pattern</label>
+        <input class="tool-text-input" id="bits-input" type="text" spellcheck="false"
+               autocapitalize="off" autocomplete="off"
+               placeholder="0x400921fb54442d18   ·   3f800000   ·   0 10000 1001001000">
+      </div>
+      <div class="tool-controls">
+        <select class="tool-select" id="bits-fmt-select"></select>
+        <button class="tool-btn ghost" id="bits-sample-btn">Load Sample</button>
+      </div>
+      <p class="tool-note" id="bits-error" role="alert"></p>
+      <div id="bits-view-host"></div>
+      <div class="net-grid" id="bits-detail-host"></div>
+      <div class="cert-section-label">Exact stored value</div>
+      <div class="exact-out" id="bits-exact-out"></div>
+    </section>
+
+    <section id="panel-math" class="hidden">
+      <p class="tool-note">
+        The classic trap: <code>0.1 + 0.2 === 0.3</code> is false. Not because floating point is
+        random, but because each of the three is already a different number than it looks, and the
+        sum is rounded once more. Both operands are rounded to the format, the exact real result of
+        the operation is computed as a fraction, and that is rounded once &mdash; which is exactly
+        what the hardware does.
+      </p>
+      <div class="lab-row">
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="lhs-input">Left</label>
+          <input class="tool-text-input" id="lhs-input" type="text" spellcheck="false" value="0.1">
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="op-select">Operation</label>
+          <select class="tool-select" id="op-select">
+            <option value="+">+ add</option>
+            <option value="-">&minus; subtract</option>
+            <option value="*">&times; multiply</option>
+            <option value="/">&divide; divide</option>
+          </select>
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="rhs-input">Right</label>
+          <input class="tool-text-input" id="rhs-input" type="text" spellcheck="false" value="0.2">
+        </div>
+        <div class="tool-field-row">
+          <label class="tool-field-label" for="math-fmt-select">Format</label>
+          <select class="tool-select" id="math-fmt-select"></select>
+        </div>
+      </div>
+      <p class="tool-note" id="math-error" role="alert"></p>
+      <div class="tip-quick-row" id="math-sample-row"></div>
+      <pre class="tool-output" id="math-out"></pre>
+    </section>
+
+    <section id="panel-limits" class="hidden">
+      <p class="tool-note">
+        Every format is the same three fields in a different balance: more exponent bits buy range,
+        more significand bits buy precision. <code>bfloat16</code> keeps binary32's exponent and
+        throws away 16 bits of significand, which is why it drops into a machine-learning pipeline
+        where binary16 overflows.
+      </p>
+      <div class="net-table-wrap">
+        <table class="net-table" id="limits-table"></table>
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="mag-input">Spacing near a magnitude</label>
+        <input class="tool-text-input" id="mag-input" type="text" spellcheck="false" value="16777216">
+      </div>
+      <p class="tool-note" id="mag-error" role="alert"></p>
+      <div class="net-table-wrap">
+        <table class="net-table" id="mag-table"></table>
+      </div>
+      <p class="tool-note">
+        A gap wider than 1 is why a counter stored in binary32 stops counting at 16&nbsp;777&nbsp;217,
+        and why seconds-since-epoch in binary32 cannot even resolve a minute.
+      </p>
+    </section>
+    <div class="comm-window">
+      <div class="comm-portrait">
+        <svg width="36" height="36" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="comm-body">
+        <div class="comm-label"><span class="dot"></span> Incoming Transmission &mdash; Slippy</div>
+        <p>&quot;0.1 was never 0.1. Here is the number your machine actually keeps.&quot;</p>
+      </div>
+    </div>
+
+    <a href="https://projects.slippylabs.com/" class="hud-btn">← Back to Archive</a>
+  </div>
+</main>
+
+
+<script>
+/* ---- exact rational arithmetic -------------------------------------------
+   Everything on this page is derived from exact fractions of BigInts, never
+   from a double. That is the whole point: a tool that explains rounding cannot
+   itself round on the way to the screen. A float's value is always n/2^k, so
+   its decimal expansion is finite and can be printed in full — 751 digits for
+   the smallest binary64 subnormal, and they are all really there. */
+
+function gcd(a, b) {
+  a = a < 0n ? -a : a;
+  b = b < 0n ? -b : b;
+  while (b) { const t = a % b; a = b; b = t; }
+  return a;
+}
+
+function rat(n, d = 1n) {
+  if (d === 0n) throw new Error('division by zero in an exact fraction');
+  if (d < 0n) { n = -n; d = -d; }
+  const g = gcd(n, d) || 1n;
+  return { n: n / g, d: d / g };
+}
+const R0 = rat(0n);
+const ratIsZero = (r) => r.n === 0n;
+const ratNeg = (r) => ({ n: -r.n, d: r.d });
+const ratAbs = (r) => ({ n: r.n < 0n ? -r.n : r.n, d: r.d });
+const ratAdd = (a, b) => rat(a.n * b.d + b.n * a.d, a.d * b.d);
+const ratSub = (a, b) => ratAdd(a, ratNeg(b));
+const ratMul = (a, b) => rat(a.n * b.n, a.d * b.d);
+const ratDiv = (a, b) => rat(a.n * b.d, a.d * b.n);
+const ratCmp = (a, b) => {
+  const l = a.n * b.d;
+  const r = b.n * a.d;
+  return l < r ? -1 : l > r ? 1 : 0;
+};
+const ratPow2 = (e) => (e >= 0n ? rat(1n << e) : rat(1n, 1n << -e));
+
+/* -- parsing --------------------------------------------------------------- */
+
+/* Accepts decimal ("-12.5", "6.022e23"), C-style hex float ("0x1.8p+3", and
+   plain "0xff" read as a hex float with exponent 0), and the specials. Returns
+   a tagged value, never a double. */
+function parseNumber(src) {
+  const s = src.trim().toLowerCase().replace(/[_\s]/g, '');
+  if (!s) throw new Error('Type a number');
+  let sign = 1n;
+  let body = s;
+  if (body[0] === '+' || body[0] === '-') {
+    if (body[0] === '-') sign = -1n;
+    body = body.slice(1);
+  }
+  if (body === 'inf' || body === 'infinity') return { kind: 'inf', sign };
+  if (body === 'nan') return { kind: 'nan' };
+  if (body.startsWith('0x')) {
+    const m = /^0x([0-9a-f]*)(?:\.([0-9a-f]*))?(?:p([+-]?\d+))?$/.exec(body);
+    if (!m || (!m[1] && !m[2])) throw new Error('Not a valid hex float — try 0x1.921fb54442d18p+1');
+    const intPart = m[1] || '';
+    const fracPart = m[2] || '';
+    const p = BigInt(m[3] || '0');
+    const digits = intPart + fracPart;
+    const mant = digits ? BigInt('0x' + digits) : 0n;
+    // each hex digit after the point is 4 binary places
+    const shift = p - BigInt(fracPart.length) * 4n;
+    return { kind: 'finite', r: ratMul(rat(sign * mant), ratPow2(shift)), neg: sign < 0n };
+  }
+  const m = /^(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/.exec(body);
+  if (!m || (!m[1] && !m[2])) throw new Error(`"${src.trim()}" is not a number I can read`);
+  const intPart = m[1] || '';
+  const fracPart = m[2] || '';
+  const exp10 = BigInt(m[3] || '0');
+  const digits = (intPart + fracPart) || '0';
+  if (digits.length > 5000) throw new Error('That is a lot of digits — keep it under 5000');
+  let n = sign * BigInt(digits);
+  let e = exp10 - BigInt(fracPart.length);
+  let d = 1n;
+  if (e >= 0n) n *= 10n ** e;
+  else d = 10n ** -e;
+  // The sign is carried separately as well: rat() cannot hold -0, and "-0" is
+  // a real, distinct float that this page of all pages must not lose.
+  return { kind: 'finite', r: rat(n, d), neg: sign < 0n };
+}
+
+/* -- formats --------------------------------------------------------------- */
+
+const FORMATS = [
+  { id: 'binary16', label: 'binary16 (half)', ebits: 5, mbits: 10 },
+  { id: 'bfloat16', label: 'bfloat16', ebits: 8, mbits: 7 },
+  { id: 'binary32', label: 'binary32 (float)', ebits: 8, mbits: 23 },
+  { id: 'binary64', label: 'binary64 (double)', ebits: 11, mbits: 52 },
+];
+FORMATS.forEach((f) => {
+  f.width = 1 + f.ebits + f.mbits;
+  f.bias = (1 << (f.ebits - 1)) - 1;
+  f.emax = f.bias;            // largest exponent of a normal value
+  f.emin = 1 - f.bias;        // smallest exponent of a normal value
+  f.qmin = f.emin - f.mbits;  // exponent of the subnormal quantum
+  f.expAll1 = (1n << BigInt(f.ebits)) - 1n;
+  f.mbitsB = BigInt(f.mbits);
+  f.hidden = 1n << f.mbitsB;  // the implicit leading 1
+});
+const FMT = Object.fromEntries(FORMATS.map((f) => [f.id, f]));
+
+/* floor(log2(|r|)) for a non-zero rational, found by comparison so it is exact
+   for every magnitude (a Math.log2 of a huge BigInt ratio is not). */
+function floorLog2(r) {
+  const a = ratAbs(r);
+  let e = BigInt(a.n.toString(2).length - a.d.toString(2).length);
+  while (ratCmp(a, ratPow2(e)) < 0) e -= 1n;
+  while (ratCmp(a, ratPow2(e + 1n)) >= 0) e += 1n;
+  return e;
+}
+
+/* Round an exact rational to a format, round-half-to-even, with subnormals and
+   overflow-to-infinity handled the way IEEE 754 defines them. */
+function roundToFormat(r, fmt, negZero = false) {
+  const sign = r.n < 0n || (ratIsZero(r) && negZero) ? 1n : 0n;
+  if (ratIsZero(r)) return { bits: sign << BigInt(fmt.width - 1), inexact: false };
+  const a = ratAbs(r);
+  const e = floorLog2(a);
+  const q = e - fmt.mbitsB < BigInt(fmt.qmin) ? BigInt(fmt.qmin) : e - fmt.mbitsB;
+  // scaled = a / 2^q as an exact fraction, then rounded to an integer
+  const scaled = ratDiv(a, ratPow2(q));
+  let m = scaled.n / scaled.d;
+  const rem = scaled.n % scaled.d;
+  const twice = rem * 2n;
+  if (twice > scaled.d || (twice === scaled.d && (m & 1n) === 1n)) m += 1n;
+  const inexact = rem !== 0n;
+  // Rounding up can carry into the next binade; the encoding below absorbs it.
+  let qq = q;
+  if (m === fmt.hidden * 2n) { m /= 2n; qq += 1n; }
+  if (m < fmt.hidden) {
+    // subnormal (or zero after rounding)
+    return { bits: (sign << BigInt(fmt.width - 1)) | m, inexact };
+  }
+  const be = qq + fmt.mbitsB + BigInt(fmt.bias);
+  if (be >= fmt.expAll1) {
+    return { bits: (sign << BigInt(fmt.width - 1)) | (fmt.expAll1 << fmt.mbitsB), inexact: true, overflow: true };
+  }
+  return { bits: (sign << BigInt(fmt.width - 1)) | (be << fmt.mbitsB) | (m - fmt.hidden), inexact };
+}
+
+function encodeSpecial(kind, sign, fmt) {
+  const s = sign < 0n ? 1n : 0n;
+  if (kind === 'inf') return (s << BigInt(fmt.width - 1)) | (fmt.expAll1 << fmt.mbitsB);
+  // A quiet NaN: exponent all ones, top significand bit set.
+  return (fmt.expAll1 << fmt.mbitsB) | (1n << (fmt.mbitsB - 1n));
+}
+
+function decodeBits(bits, fmt) {
+  const signBit = (bits >> BigInt(fmt.width - 1)) & 1n;
+  const be = (bits >> fmt.mbitsB) & fmt.expAll1;
+  const mant = bits & (fmt.hidden - 1n);
+  const sign = signBit === 1n ? -1n : 1n;
+  if (be === fmt.expAll1) {
+    return mant === 0n
+      ? { cls: 'infinity', signBit, be, mant, r: null }
+      : { cls: 'NaN', signBit, be, mant, r: null, quiet: (mant >> (fmt.mbitsB - 1n)) === 1n };
+  }
+  if (be === 0n) {
+    if (mant === 0n) return { cls: 'zero', signBit, be, mant, r: R0, exp: null, significand: 0n };
+    return {
+      cls: 'subnormal', signBit, be, mant, exp: fmt.emin, significand: mant,
+      r: ratMul(rat(sign * mant), ratPow2(BigInt(fmt.qmin))),
+    };
+  }
+  const significand = fmt.hidden | mant;
+  const exp = Number(be) - fmt.bias;
+  return {
+    cls: 'normal', signBit, be, mant, exp, significand,
+    r: ratMul(rat(sign * significand), ratPow2(BigInt(exp) - fmt.mbitsB)),
+  };
+}
+
+/* The gap to the next representable value at this magnitude. */
+function ulpOf(bits, fmt) {
+  const d = decodeBits(bits, fmt);
+  if (d.cls === 'infinity' || d.cls === 'NaN') return null;
+  const be = d.be === 0n ? 1n : d.be;
+  return ratPow2(be - BigInt(fmt.bias) - fmt.mbitsB);
+}
+
+/* Step one representable value up or down. Adding 1 to the magnitude field
+   walks binade boundaries correctly, which is exactly why the exponent sits
+   above the significand in the layout. */
+function neighbour(bits, fmt, dir) {
+  const signBit = (bits >> BigInt(fmt.width - 1)) & 1n;
+  const mag = bits & ((1n << BigInt(fmt.width - 1)) - 1n);
+  const top = fmt.expAll1 << fmt.mbitsB;
+  if (mag >= top) return bits; // infinity or NaN: stay put
+  const up = dir > 0 ? signBit === 0n : signBit === 1n;
+  if (mag === 0n) {
+    // zero: one step either way lands on the smallest subnormal
+    return (dir > 0 ? 0n : 1n) << BigInt(fmt.width - 1) | 1n;
+  }
+  const newMag = up ? mag + 1n : mag - 1n;
+  if (newMag === 0n) return signBit << BigInt(fmt.width - 1); // down to signed zero
+  return (signBit << BigInt(fmt.width - 1)) | newMag;
+}
+
+/* -- decimal rendering ----------------------------------------------------- */
+
+/* Exact, complete decimal expansion of a dyadic rational (n / 2^k). Returns
+   null if the denominator has any factor other than 2, which only happens for
+   an exact division in the arithmetic lab. */
+function exactDyadicDecimal(r) {
+  let d = r.d;
+  let k = 0n;
+  while (d % 2n === 0n) { d /= 2n; k += 1n; }
+  if (d !== 1n) return null;
+  const neg = r.n < 0n;
+  const scaled = (neg ? -r.n : r.n) * 5n ** k;
+  let s = scaled.toString();
+  const ki = Number(k);
+  if (ki === 0) return (neg ? '-' : '') + s;
+  if (s.length <= ki) s = '0'.repeat(ki - s.length + 1) + s;
+  const int = s.slice(0, s.length - ki);
+  const frac = s.slice(s.length - ki).replace(/0+$/, '');
+  return (neg ? '-' : '') + int + (frac ? '.' + frac : '');
+}
+
+/* Round |r| to `sig` significant digits. Returns {digits, exp10, exact} where
+   the value is 0.d1d2… × 10^(exp10+1), i.e. digits[0] is the leading digit. */
+function sigDigits(r, sig) {
+  const a = ratAbs(r);
+  if (ratIsZero(a)) return { digits: '0'.repeat(sig), exp10: 0, exact: true };
+  let e10 = a.n.toString().length - a.d.toString().length;
+  const pow10 = (k) => (k >= 0 ? rat(10n ** BigInt(k)) : rat(1n, 10n ** BigInt(-k)));
+  while (ratCmp(a, pow10(e10)) < 0) e10 -= 1;
+  while (ratCmp(a, pow10(e10 + 1)) >= 0) e10 += 1;
+  const scale = sig - 1 - e10;
+  const scaled = ratMul(a, pow10(scale));
+  let q = scaled.n / scaled.d;
+  const rem = scaled.n % scaled.d;
+  const exact = rem === 0n;
+  if (rem * 2n >= scaled.d) q += 1n;      // round half up: only used for display
+  let digits = q.toString();
+  if (digits.length > sig) { digits = digits.slice(0, sig); e10 += 1; }
+  return { digits, exp10: e10, exact };
+}
+
+function formatSig(r, sig) {
+  if (ratIsZero(r)) return '0';
+  const { digits, exp10, exact } = sigDigits(r, sig);
+  const neg = r.n < 0n;
+  let body;
+  if (exp10 >= -5 && exp10 < 17) {
+    if (exp10 >= 0) {
+      const int = digits.slice(0, exp10 + 1).padEnd(exp10 + 1, '0');
+      const frac = digits.slice(exp10 + 1).replace(/0+$/, '');
+      body = frac ? `${int}.${frac}` : int;
+    } else {
+      body = `0.${'0'.repeat(-exp10 - 1)}${digits.replace(/0+$/, '') || '0'}`;
+    }
+  } else {
+    const lead = digits[0];
+    const frac = digits.slice(1).replace(/0+$/, '');
+    body = `${lead}${frac ? '.' + frac : ''}e${exp10 >= 0 ? '+' : '-'}${Math.abs(exp10)}`;
+  }
+  return (neg ? '-' : '') + body + (exact ? '' : '…');
+}
+
+/* The shortest decimal that reads back as this exact bit pattern — what a
+   sensible printf does, found by trying lengths until the round trip holds. */
+function shortestRoundTrip(bits, fmt) {
+  const d = decodeBits(bits, fmt);
+  if (d.cls === 'infinity') return d.signBit ? '-Infinity' : 'Infinity';
+  if (d.cls === 'NaN') return 'NaN';
+  if (d.cls === 'zero') return d.signBit ? '-0' : '0';
+  const limit = fmt.mbits > 23 ? 17 : fmt.mbits > 10 ? 9 : 5;
+  for (let sig = 1; sig <= limit; sig++) {
+    const { digits, exp10 } = sigDigits(d.r, sig);
+    const text = `${d.signBit ? '-' : ''}${digits[0]}${digits.length > 1 ? '.' + digits.slice(1) : ''}e${exp10}`;
+    const back = roundToFormat(parseNumber(text).r, fmt);
+    if (back.bits === bits) {
+      // re-render that same value in the friendlier of the two notations
+      return formatSig(d.r, sig).replace(/…$/, '');
+    }
+  }
+  return formatSig(d.r, limit);
+}
+
+function bitsToHex(bits, fmt) {
+  return '0x' + bits.toString(16).padStart(Math.ceil(fmt.width / 4), '0');
+}
+
+function binaryScientific(bits, fmt) {
+  const d = decodeBits(bits, fmt);
+  if (d.cls === 'infinity' || d.cls === 'NaN' || d.cls === 'zero') return '—';
+  const frac = d.mant.toString(2).padStart(fmt.mbits, '0').replace(/0+$/, '');
+  const lead = d.cls === 'subnormal' ? '0' : '1';
+  const exp = d.cls === 'subnormal' ? fmt.emin : d.exp;
+  return `${d.signBit ? '-' : ''}${lead}${frac ? '.' + frac : ''} × 2^${exp}`;
+}
+
+/* -- native cross-check ----------------------------------------------------
+   binary64 bits <-> a real JS number, so the arithmetic lab can compare its own
+   exact-then-round answer against what the CPU produced. */
+const NATIVE_BUF = new ArrayBuffer(8);
+const NATIVE_F64 = new Float64Array(NATIVE_BUF);
+const NATIVE_U32 = new Uint32Array(NATIVE_BUF);
+const NATIVE_F32 = new Float32Array(NATIVE_BUF);
+
+function bitsToNumber64(bits) {
+  NATIVE_U32[0] = Number(bits & 0xffffffffn);
+  NATIVE_U32[1] = Number((bits >> 32n) & 0xffffffffn);
+  return NATIVE_F64[0];
+}
+function number64ToBits(x) {
+  NATIVE_F64[0] = x;
+  return (BigInt(NATIVE_U32[1]) << 32n) | BigInt(NATIVE_U32[0]);
+}
+function bitsToNumber32(bits) {
+  NATIVE_U32[0] = Number(bits & 0xffffffffn);
+  return NATIVE_F32[0];
+}
+function number32ToBits(x) {
+  NATIVE_F32[0] = x;
+  return BigInt(NATIVE_U32[0]);
+}
+
+/* -- the arithmetic lab --------------------------------------------------- */
+
+function exactOp(a, op, b) {
+  if (op === '+') return ratAdd(a, b);
+  if (op === '-') return ratSub(a, b);
+  if (op === '*') return ratMul(a, b);
+  if (ratIsZero(b)) return null; // division by zero: inf or NaN, handled by caller
+  return ratDiv(a, b);
+}
+
+/* The sign of a zero result is not implied by the arithmetic — IEEE 754 sets
+   it by rule: multiply and divide take the exclusive-or of the operand signs,
+   while a sum is negative only when both addends were. */
+function zeroResultSign(op, aNeg, bNeg) {
+  if (op === '*' || op === '/') return aNeg !== bNeg;
+  if (op === '+') return aNeg && bNeg;
+  return aNeg && !bNeg; // a - b is a + (-b)
+}
+
+/* -- format facts --------------------------------------------------------- */
+
+function formatLimits(fmt) {
+  const maxBits = ((fmt.expAll1 - 1n) << fmt.mbitsB) | (fmt.hidden - 1n);
+  const minNormalBits = 1n << fmt.mbitsB;
+  return {
+    max: decodeBits(maxBits, fmt).r,
+    minNormal: decodeBits(minNormalBits, fmt).r,
+    minSubnormal: decodeBits(1n, fmt).r,
+    epsilon: ratPow2(-fmt.mbitsB),
+    // digits that always survive a decimal -> format -> decimal round trip
+    roundTripDigits: Math.ceil((fmt.mbits + 1) * Math.log10(2)) + 1,
+    safeDigits: Math.floor(fmt.mbits * Math.log10(2)),
+  };
+}
+
+/* ==== UI ==== */
+
+const $ = (id) => document.getElementById(id);
+
+const SAMPLES = [
+  ['0.1', '0.1'], ['0.2', '0.2'], ['0.3', '0.3'],
+  ['1/3', '0.3333333333333333'],
+  ['16777217', '16777217'],
+  ['2^53+1', '9007199254740993'],
+  ['π', '3.141592653589793'],
+  ['max half', '65504'],
+  ['tiny', '5e-324'],
+  ['huge', '1.7976931348623157e308'],
+  ['hex float', '0x1.921fb54442d18p+1'],
+  ['-0', '-0'],
+];
+
+const MATH_SAMPLES = [
+  ['0.1 + 0.2', '0.1', '+', '0.2'],
+  ['0.1 × 3', '0.1', '*', '3'],
+  ['1 ÷ 3', '1', '/', '3'],
+  ['1e16 + 1', '1e16', '+', '1'],
+  ['0.7 + 0.1', '0.7', '+', '0.1'],
+  ['4.35 × 100', '4.35', '*', '100'],
+];
+
+let state = { fmt: FMT.binary64, bits: 0n, source: null };
+let bitsState = { fmt: FMT.binary64, bits: 0n };
+
+/* ---- shared renderers ---- */
+
+function fillFormatSelect(sel, selected) {
+  sel.innerHTML = FORMATS.map((f) => `<option value="${f.id}"${f.id === selected ? ' selected' : ''}>${f.label} — ${f.width} bits</option>`).join('');
+}
+
+const PHONE = () => window.matchMedia('(max-width: 560px)').matches;
+
+function renderBitView(host, bits, fmt, onToggle) {
+  host.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'bitview';
+
+  const legend = document.createElement('div');
+  legend.className = 'bit-legend';
+  legend.innerHTML = `
+    <span class="bl sign">sign · 1</span>
+    <span class="bl exp">exponent · ${fmt.ebits}</span>
+    <span class="bl man">significand · ${fmt.mbits}</span>`;
+  wrap.appendChild(legend);
+
+  const row = document.createElement('div');
+  row.className = 'bit-row';
+  for (let i = 0; i < fmt.width; i++) {
+    const pos = BigInt(fmt.width - 1 - i); // bit weight, MSB first
+    const bit = (bits >> pos) & 1n;
+    // A span, not a button: at phone width these are 26px wide, which no thumb
+    // can hit reliably, so they are only promoted to real controls when there is
+    // room for them to be one. The field buttons above cover the small screen.
+    const cell = document.createElement('span');
+    cell.className = 'fbit ' + (i === 0 ? 'sign' : i <= fmt.ebits ? 'exp' : 'man');
+    if (bit === 1n) cell.classList.add('on');
+    cell.textContent = bit.toString();
+    cell.title = `bit ${pos} — ${i === 0 ? 'sign' : i <= fmt.ebits ? 'exponent' : 'significand'}`;
+    if (onToggle && !PHONE()) {
+      cell.setAttribute('role', 'button');
+      cell.tabIndex = 0;
+      cell.classList.add('live');
+      cell.addEventListener('click', () => onToggle(pos));
+      cell.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onToggle(pos); }
+      });
+    }
+    row.appendChild(cell);
+  }
+  wrap.appendChild(row);
+  host.appendChild(wrap);
+}
+
+function tiles(host, rows) {
+  host.innerHTML = rows.map(([label, value]) => `
+    <div class="net-tile">
+      <div class="net-tile-label">${label}</div>
+      <div class="net-tile-value mono">${value}</div>
+    </div>`).join('');
+}
+
+function detailRows(bits, fmt) {
+  const d = decodeBits(bits, fmt);
+  const ulp = ulpOf(bits, fmt);
+  const rows = [
+    ['Class', d.cls + (d.cls === 'NaN' ? (d.quiet ? ' (quiet)' : ' (signalling)') : '')],
+    ['Hex', bitsToHex(bits, fmt)],
+    ['Sign', d.signBit === 1n ? '1 — negative' : '0 — positive'],
+    ['Exponent field', `${d.be} → ${d.cls === 'normal' ? (d.exp >= 0 ? '+' : '') + d.exp
+      : d.cls === 'subnormal' ? `${fmt.emin} (subnormal)` : '—'}`],
+    ['Significand', d.cls === 'infinity' || d.cls === 'NaN'
+      ? `0x${d.mant.toString(16)}`
+      : `${d.significand} / 2^${fmt.mbits}`],
+    ['Binary', binaryScientific(bits, fmt)],
+    ['Shortest decimal', shortestRoundTrip(bits, fmt)],
+    ['ULP here', ulp ? formatSig(ulp, 9) : '—'],
+    ['Previous float', shortestRoundTrip(neighbour(bits, fmt, -1), fmt)],
+    ['Next float', shortestRoundTrip(neighbour(bits, fmt, +1), fmt)],
+  ];
+  return rows;
+}
+
+/* ---- panel: number -> bits ---- */
+
+function renderDecode() {
+  const fmt = state.fmt;
+  renderBitView($('bitview-host'), state.bits, fmt, (pos) => {
+    state.bits ^= 1n << pos;
+    state.source = null;
+    $('num-input').value = shortestRoundTrip(state.bits, fmt);
+    renderDecode();
+    renderCompare();
+  });
+  tiles($('detail-host'), detailRows(state.bits, fmt));
+
+  const d = decodeBits(state.bits, fmt);
+  const out = $('exact-out');
+  const note = $('exact-note');
+  if (!d.r) {
+    out.textContent = d.cls === 'infinity' ? (d.signBit ? '-∞' : '∞') : 'NaN — not a number, so there is nothing to expand';
+    note.textContent = '';
+    return;
+  }
+  const exact = d.cls === 'zero' && d.signBit === 1n
+    ? '-0'
+    : exactDyadicDecimal(d.r) ?? formatSig(d.r, 60);
+  out.textContent = exact;
+  const digits = exact.replace(/[-.]/g, '').replace(/^0+/, '').length;
+  const parts = [`${digits} significant digit${digits === 1 ? '' : 's'}, and every one of them is exact — a float is always some integer divided by a power of two.`];
+  if (state.source && state.source.kind === 'finite') {
+    const diff = ratSub(state.source.r, d.r);
+    if (ratIsZero(diff)) {
+      parts.push('Your input was representable exactly, so nothing was lost.');
+    } else {
+      const ulp = ulpOf(state.bits, fmt);
+      const inUlps = ulp ? formatSig(ratDiv(ratAbs(diff), ulp), 4) : '—';
+      const rel = ratIsZero(state.source.r) ? '—'
+        : formatSig(ratDiv(ratAbs(diff), ratAbs(state.source.r)), 4);
+      parts.push(`Your input differs from this by ${formatSig(diff, 6)} — that is ${inUlps} ULP, a relative error of ${rel}.`);
+    }
+  }
+  note.textContent = parts.join(' ');
+}
+
+function renderCompare() {
+  const src = state.source;
+  const rows = FORMATS.map((f) => {
+    let bits;
+    let overflow = false;
+    let inexact = false;
+    if (!src) {
+      // no fresh input (a bit was flipped): re-round the current value instead
+      const d = decodeBits(state.bits, state.fmt);
+      if (!d.r) bits = encodeSpecial(d.cls === 'infinity' ? 'inf' : 'nan', d.signBit ? -1n : 1n, f);
+      else {
+        const r = roundToFormat(d.r, f, d.signBit === 1n);
+        bits = r.bits; overflow = !!r.overflow; inexact = r.inexact;
+      }
+    } else if (src.kind === 'finite') {
+      const r = roundToFormat(src.r, f, src.neg);
+      bits = r.bits;
+      overflow = !!r.overflow;
+      inexact = r.inexact;
+    } else {
+      bits = encodeSpecial(src.kind, src.sign || 1n, f);
+    }
+    const d = decodeBits(bits, f);
+    const fate = overflow ? '<span class="bad">overflowed to ∞</span>'
+      : inexact ? '<span class="warn">rounded</span>'
+      : '<span class="good">exact</span>';
+    const cur = f.id === state.fmt.id ? ' class="row-current"' : '';
+    return `<tr${cur}>
+      <td>${f.label}</td>
+      <td>${shortestRoundTrip(bits, f)}</td>
+      <td>${bitsToHex(bits, f)}</td>
+      <td>${d.cls}</td>
+      <td>${fate}</td>
+    </tr>`;
+  }).join('');
+  $('cmp-table').innerHTML = `<thead><tr><th>Format</th><th>Stores</th><th>Bits</th><th>Class</th><th>Fate of your input</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+function applyNumber(text, keepInput) {
+  const err = $('num-error');
+  try {
+    const parsed = parseNumber(text);
+    state.source = parsed;
+    state.bits = parsed.kind === 'finite'
+      ? roundToFormat(parsed.r, state.fmt, parsed.neg).bits
+      : encodeSpecial(parsed.kind, parsed.sign || 1n, state.fmt);
+    err.style.display = 'none';
+    if (!keepInput) $('num-input').value = text;
+    renderDecode();
+    renderCompare();
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+}
+
+$('num-input').addEventListener('input', (e) => applyNumber(e.target.value, true));
+
+fillFormatSelect($('fmt-select'), 'binary64');
+$('fmt-select').addEventListener('change', () => {
+  const d = decodeBits(state.bits, state.fmt);
+  state.fmt = FMT[$('fmt-select').value];
+  // Carry the current value across, re-rounded to the new format.
+  if (state.source) applyNumber($('num-input').value, true);
+  else {
+    state.bits = d.r ? roundToFormat(d.r, state.fmt, d.signBit === 1n).bits
+      : encodeSpecial(d.cls === 'infinity' ? 'inf' : 'nan', d.signBit ? -1n : 1n, state.fmt);
+    renderDecode();
+    renderCompare();
+  }
+});
+
+$('sign-btn').addEventListener('click', () => {
+  state.bits ^= 1n << BigInt(state.fmt.width - 1);
+  state.source = null;
+  $('num-input').value = shortestRoundTrip(state.bits, state.fmt);
+  renderDecode();
+  renderCompare();
+});
+
+/* Exponent +-1 is a halving or doubling, which is exact in binary — except at
+   the ends, where it saturates into a subnormal or into infinity. */
+function nudgeExponent(delta) {
+  const fmt = state.fmt;
+  const d = decodeBits(state.bits, fmt);
+  if (d.cls === 'infinity' || d.cls === 'NaN' || d.cls === 'zero') return;
+  if (!d.r) return;
+  const scaled = ratMul(d.r, ratPow2(BigInt(delta)));
+  const res = roundToFormat(scaled, fmt, d.signBit === 1n);
+  state.bits = res.bits;
+  state.source = null;
+  $('num-input').value = shortestRoundTrip(state.bits, fmt);
+  renderDecode();
+  renderCompare();
+}
+$('expup-btn').addEventListener('click', () => nudgeExponent(1));
+$('expdown-btn').addEventListener('click', () => nudgeExponent(-1));
+
+// Rotating a phone crosses the breakpoint, and with it whether the bit strip is
+// interactive; re-render so the two never disagree.
+window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
+  renderDecode();
+  renderBits();
+});
+
+$('prev-btn').addEventListener('click', () => step(-1));
+$('next-btn').addEventListener('click', () => step(+1));
+function step(dir) {
+  state.bits = neighbour(state.bits, state.fmt, dir);
+  state.source = null;
+  $('num-input').value = shortestRoundTrip(state.bits, state.fmt);
+  renderDecode();
+  renderCompare();
+}
+
+$('sample-row').innerHTML = SAMPLES
+  .map(([label, value], i) => `<button class="tip-quick-btn" data-i="${i}">${label}</button>`).join('');
+$('sample-row').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tip-quick-btn');
+  if (!btn) return;
+  applyNumber(SAMPLES[Number(btn.dataset.i)][1]);
+});
+
+/* ---- panel: bits -> number ---- */
+
+function parseBitPattern(text, fmt) {
+  const s = text.trim().toLowerCase().replace(/[\s_]/g, '');
+  if (!s) throw new Error('Paste a bit pattern');
+  let bits;
+  if (s.startsWith('0x')) bits = BigInt(s);
+  else if (/^[01]+$/.test(s)) {
+    if (s.length !== fmt.width) {
+      throw new Error(`That is ${s.length} binary digits; ${fmt.label} is ${fmt.width} bits wide`);
+    }
+    bits = BigInt('0b' + s);
+  } else if (/^[0-9a-f]+$/.test(s)) bits = BigInt('0x' + s);
+  else throw new Error('Use hex (0x1fc) or a run of 0s and 1s');
+  const max = (1n << BigInt(fmt.width)) - 1n;
+  if (bits > max) throw new Error(`0x${bits.toString(16)} does not fit in ${fmt.width} bits`);
+  return bits;
+}
+
+function renderBits() {
+  const fmt = bitsState.fmt;
+  renderBitView($('bits-view-host'), bitsState.bits, fmt, (pos) => {
+    bitsState.bits ^= 1n << pos;
+    $('bits-input').value = bitsToHex(bitsState.bits, fmt);
+    renderBits();
+  });
+  tiles($('bits-detail-host'), detailRows(bitsState.bits, fmt));
+  const d = decodeBits(bitsState.bits, fmt);
+  $('bits-exact-out').textContent = d.r
+    ? (d.cls === 'zero' && d.signBit === 1n ? '-0' : exactDyadicDecimal(d.r) ?? formatSig(d.r, 60))
+    : (d.cls === 'infinity' ? (d.signBit ? '-∞' : '∞') : 'NaN');
+}
+
+function applyBits(text) {
+  const err = $('bits-error');
+  try {
+    bitsState.bits = parseBitPattern(text, bitsState.fmt);
+    err.style.display = 'none';
+    renderBits();
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+}
+
+fillFormatSelect($('bits-fmt-select'), 'binary64');
+$('bits-input').addEventListener('input', (e) => applyBits(e.target.value));
+$('bits-fmt-select').addEventListener('change', () => {
+  bitsState.fmt = FMT[$('bits-fmt-select').value];
+  const max = (1n << BigInt(bitsState.fmt.width)) - 1n;
+  if (bitsState.bits > max) bitsState.bits &= max;
+  $('bits-input').value = bitsToHex(bitsState.bits, bitsState.fmt);
+  renderBits();
+});
+$('bits-sample-btn').addEventListener('click', () => {
+  const samples = { binary64: '0x400921fb54442d18', binary32: '0x40490fdb', binary16: '0x3c00', bfloat16: '0x4049' };
+  $('bits-input').value = samples[bitsState.fmt.id];
+  applyBits($('bits-input').value);
+});
+
+/* ---- panel: arithmetic lab ---- */
+
+function renderMath() {
+  const err = $('math-error');
+  const out = $('math-out');
+  const fmt = FMT[$('math-fmt-select').value];
+  const op = $('op-select').value;
+  let A;
+  let B;
+  try {
+    A = parseNumber($('lhs-input').value);
+    B = parseNumber($('rhs-input').value);
+    err.style.display = 'none';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+    return;
+  }
+  if (A.kind !== 'finite' || B.kind !== 'finite') {
+    out.textContent = 'The lab works on finite numbers — ∞ and NaN have their own rules.';
+    return;
+  }
+  const aBits = roundToFormat(A.r, fmt, A.neg).bits;
+  const bBits = roundToFormat(B.r, fmt, B.neg).bits;
+  const a = decodeBits(aBits, fmt).r;
+  const b = decodeBits(bBits, fmt).r;
+
+  const lines = [];
+  const show = (label, r) => {
+    const exact = exactDyadicDecimal(r);
+    lines.push(`${label.padEnd(22)}${exact ?? formatSig(r, 45)}`);
+  };
+  lines.push(`format: ${fmt.label}`);
+  lines.push('');
+  show('left, as stored', a);
+  show('right, as stored', b);
+  lines.push('');
+
+  if (op === '/' && ratIsZero(b)) {
+    lines.push(ratIsZero(a)
+      ? 'exact result           0/0 — NaN, the one case with no numeric answer'
+      : `exact result           ${a.n < 0n ? '-' : ''}∞ — a finite number divided by zero`);
+    out.textContent = lines.join('\n');
+    return;
+  }
+
+  const exact = exactOp(a, op, b);
+  const aNeg = (aBits >> BigInt(fmt.width - 1)) === 1n;
+  const bNeg = (bBits >> BigInt(fmt.width - 1)) === 1n;
+  const zeroNeg = zeroResultSign(op, aNeg, bNeg);
+  const rounded = roundToFormat(exact, fmt, zeroNeg);
+  const stored = decodeBits(rounded.bits, fmt).r;
+  const exactText = exactDyadicDecimal(exact);
+  lines.push(`exact ${op} result        ${exactText ?? formatSig(exact, 45)}`);
+  show('rounded to format', stored);
+  lines.push(`shortest decimal      ${shortestRoundTrip(rounded.bits, fmt)}`);
+  lines.push(`bits                  ${bitsToHex(rounded.bits, fmt)}`);
+  const diff = ratSub(exact, stored);
+  if (ratIsZero(diff)) {
+    lines.push('rounding error        none — this operation was exact');
+  } else {
+    const ulp = ulpOf(rounded.bits, fmt);
+    lines.push(`rounding error        ${formatSig(diff, 6)}  (${formatSig(ratDiv(ratAbs(diff), ulp), 4)} ULP)`);
+  }
+
+  // Does the naive decimal comparison hold?
+  const naive = `${$('lhs-input').value.trim()} ${op} ${$('rhs-input').value.trim()}`;
+  const plainBits = roundToFormat(exactOp(A.r, op, B.r) ?? R0, fmt, zeroNeg).bits;
+  lines.push('');
+  lines.push(`${naive} in real arithmetic is ${formatSig(exactOp(A.r, op, B.r) ?? R0, 20)},`);
+  lines.push(`which this format stores as ${shortestRoundTrip(plainBits, fmt)}`);
+  lines.push(plainBits === rounded.bits
+    ? '→ same bits either way, so the rounding of the inputs did not matter here.'
+    : '→ different bits: the inputs were rounded *before* the operation, and that changed the answer.');
+
+  // Free self-check: the CPU can do binary64 and binary32 natively.
+  if (fmt.id === 'binary64' || fmt.id === 'binary32') {
+    const toN = fmt.id === 'binary64' ? bitsToNumber64 : bitsToNumber32;
+    const toB = fmt.id === 'binary64' ? number64ToBits : number32ToBits;
+    const x = toN(aBits);
+    const y = toN(bBits);
+    const native = op === '+' ? x + y : op === '-' ? x - y : op === '*' ? x * y : x / y;
+    const nativeBits = toB(fmt.id === 'binary32' ? Math.fround(native) : native);
+    lines.push('');
+    lines.push(nativeBits === rounded.bits
+      ? `self-check            your CPU produced the same bits (${bitsToHex(nativeBits, fmt)})`
+      : `self-check FAILED     CPU says ${bitsToHex(nativeBits, fmt)}, this page says ${bitsToHex(rounded.bits, fmt)}`);
+  }
+  out.textContent = lines.join('\n');
+}
+
+fillFormatSelect($('math-fmt-select'), 'binary64');
+['lhs-input', 'rhs-input'].forEach((id) => $(id).addEventListener('input', renderMath));
+['op-select', 'math-fmt-select'].forEach((id) => $(id).addEventListener('change', renderMath));
+$('math-sample-row').innerHTML = MATH_SAMPLES
+  .map(([label], i) => `<button class="tip-quick-btn" data-i="${i}">${label}</button>`).join('');
+$('math-sample-row').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tip-quick-btn');
+  if (!btn) return;
+  const [, l, op, r] = MATH_SAMPLES[Number(btn.dataset.i)];
+  $('lhs-input').value = l;
+  $('op-select').value = op;
+  $('rhs-input').value = r;
+  renderMath();
+});
+
+/* ---- panel: limits ---- */
+
+function renderLimits() {
+  const rows = FORMATS.map((f) => {
+    const L = formatLimits(f);
+    return `<tr>
+      <td>${f.label}</td>
+      <td>${f.width}</td>
+      <td>${f.ebits} / ${f.mbits}</td>
+      <td>${f.emin} … ${f.emax}</td>
+      <td>${formatSig(L.max, 6)}</td>
+      <td>${formatSig(L.minNormal, 6)}</td>
+      <td>${formatSig(L.minSubnormal, 6)}</td>
+      <td>${formatSig(L.epsilon, 6)}</td>
+      <td>${L.safeDigits} / ${L.roundTripDigits}</td>
+    </tr>`;
+  }).join('');
+  $('limits-table').innerHTML = `<thead><tr>
+      <th>Format</th><th>Bits</th><th>Exp / signif</th><th>Exponent range</th>
+      <th>Largest finite</th><th>Smallest normal</th><th>Smallest subnormal</th>
+      <th>Epsilon</th><th>Digits safe / round-trip</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+function renderMagnitude() {
+  const err = $('mag-error');
+  let parsed;
+  try {
+    parsed = parseNumber($('mag-input').value);
+    if (parsed.kind !== 'finite') throw new Error('Use a finite number');
+    err.style.display = 'none';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+    return;
+  }
+  const rows = FORMATS.map((f) => {
+    const res = roundToFormat(parsed.r, f, parsed.neg);
+    const d = decodeBits(res.bits, f);
+    const ulp = ulpOf(res.bits, f);
+    const nearestInt = d.r && !res.overflow ? shortestRoundTrip(res.bits, f) : '—';
+    return `<tr>
+      <td>${f.label}</td>
+      <td>${res.overflow ? '<span class="bad">∞</span>' : nearestInt}</td>
+      <td>${ulp && !res.overflow ? formatSig(ulp, 6) : '—'}</td>
+      <td>${res.overflow ? 'out of range' : res.inexact ? '<span class="warn">rounded</span>' : '<span class="good">exact</span>'}</td>
+    </tr>`;
+  }).join('');
+  $('mag-table').innerHTML = `<thead><tr><th>Format</th><th>Nearest value</th><th>Gap to the next one</th><th>Your number</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+$('mag-input').addEventListener('input', renderMagnitude);
+
+/* ---- tabs ---- */
+
+document.querySelector('.filter-bar').addEventListener('click', (e) => {
+  const tab = e.target.closest('.hud-tab');
+  if (!tab) return;
+  document.querySelectorAll('.filter-bar .hud-tab').forEach((t) => t.classList.remove('active'));
+  tab.classList.add('active');
+  ['panel-decode', 'panel-bits', 'panel-math', 'panel-limits'].forEach((id) => {
+    $(id).classList.toggle('hidden', id !== tab.dataset.panel);
+  });
+});
+
+/* ---- boot ---- */
+
+applyNumber('0.1');
+$('bits-input').value = '0x400921fb54442d18';
+applyBits($('bits-input').value);
+renderMath();
+renderLimits();
+renderMagnitude();
+</script>
+<!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
+<script defer src="https://slippylabs.com/deck/deck.js"></script>
+<!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites
+     share no CSS, so it carries its own styles and inherits the page's text
+     colour instead of assuming a palette. position/z-index are load bearing --
+     the HUD theme's .starfield/.scanlines are fixed at z-index 0-1 and would
+     paint straight over an unpositioned footer.
+     The .page-wrap trim below is what keeps the bar on the first screen. -->
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.sl-legal a:hover,.sl-legal a:focus-visible{text-decoration:underline;opacity:1}
+/* This page centres .page-wrap at min-height:100vh, which would push the bar a
+   whole screen below the fold. Give back exactly the bar height instead of
+   adding a scrollbar to a page that had none. */
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>
