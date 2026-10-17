@@ -1455,11 +1455,19 @@ mark.regex-match { background: rgba(57, 255, 143, 0.3); color: var(--hud-green);
 .net-table tr.row-current td { background: rgba(57, 255, 143, 0.08); }
 
 @media (max-width: 560px) {
-  /* 64 bits will never be one row on a phone; they wrap, and the field colours
-     carry the structure instead of position. Here they are a readout only — the
-     Flip sign / Exponent / neighbour buttons are the editing affordance, because
-     64 targets of 44px would need a 2800px-wide screen. */
-  .fbit { width: 30px; padding: 11px 0; }
+  /* 64 bits will never be one row on a phone, so the strip is a grid of 8
+     columns: one byte per line, MSB first, ~34x44px a bit and tappable. The
+     field colours carry sign/exponent/significand and each bit shows its
+     number in the corner. */
+  .bit-row { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; }
+  .fbit {
+    width: auto; min-height: 44px; padding: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+  }
+  .fbit::after {
+    content: attr(data-i); position: absolute; top: 2px; left: 3px;
+    font-size: 0.5rem; line-height: 1; opacity: 0.6; font-weight: normal;
+  }
   .exact-out { font-size: 0.75rem; }
   /* The shared phone block gives these height but not width, and "0.1" is a
      narrow label. */
@@ -1492,3 +1500,20 @@ mark.regex-match { background: rgba(57, 255, 143, 0.3); color: var(--hud-green);
   input[type="range"] { height: 44px; }
   .swatch-lock { width: 40px; height: 40px; }
 }
+
+/* A phone held sideways (~780px) misses the 560px block above and got the
+   desktop strip, 20px a bit. Lines of 16: ~40x44px each. */
+@media (hover: none) and (pointer: coarse) and (max-height: 500px) {
+  .bit-row { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 3px; }
+  .fbit {
+    width: auto; min-height: 44px; padding: 0; position: relative;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+  }
+  .fbit::after {
+    content: attr(data-i); position: absolute; top: 2px; left: 3px;
+    font-size: 0.5rem; line-height: 1; opacity: 0.6; font-weight: normal;
+  }
+}
+/* At 16px (the iOS focus-zoom fix) a select grows to its longest option; the
+   format picker reached 302px in a 254px column at 320 and widened the page. */
+@media (hover: none) and (pointer: coarse) { select[class], textarea[class] { max-width: 100%; } }

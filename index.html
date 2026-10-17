@@ -18,7 +18,7 @@
 <meta name="twitter:image" content="https://float-inspector.slippylabs.com/og-image.png?h=72d98cceec">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2222%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
 <meta name="theme-color" content="#050b10">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
 (function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
 </head>
@@ -600,8 +600,6 @@ function fillFormatSelect(sel, selected) {
   sel.innerHTML = FORMATS.map((f) => `<option value="${f.id}"${f.id === selected ? ' selected' : ''}>${f.label} — ${f.width} bits</option>`).join('');
 }
 
-const PHONE = () => window.matchMedia('(max-width: 560px)').matches;
-
 function renderBitView(host, bits, fmt, onToggle) {
   host.innerHTML = '';
   const wrap = document.createElement('div');
@@ -620,15 +618,16 @@ function renderBitView(host, bits, fmt, onToggle) {
   for (let i = 0; i < fmt.width; i++) {
     const pos = BigInt(fmt.width - 1 - i); // bit weight, MSB first
     const bit = (bits >> pos) & 1n;
-    // A span, not a button: at phone width these are 26px wide, which no thumb
-    // can hit reliably, so they are only promoted to real controls when there is
-    // room for them to be one. The field buttons above cover the small screen.
+    // A span with role=button. On a phone the CSS lays the strip out a byte
+    // per line (8 columns of ~34x44px), so every bit is a thumb-sized target,
+    // and data-i puts the bit number in the cell's corner.
     const cell = document.createElement('span');
     cell.className = 'fbit ' + (i === 0 ? 'sign' : i <= fmt.ebits ? 'exp' : 'man');
     if (bit === 1n) cell.classList.add('on');
     cell.textContent = bit.toString();
+    cell.dataset.i = pos.toString();
     cell.title = `bit ${pos} — ${i === 0 ? 'sign' : i <= fmt.ebits ? 'exponent' : 'significand'}`;
-    if (onToggle && !PHONE()) {
+    if (onToggle) {
       cell.setAttribute('role', 'button');
       cell.tabIndex = 0;
       cell.classList.add('live');
@@ -811,13 +810,6 @@ function nudgeExponent(delta) {
 }
 $('expup-btn').addEventListener('click', () => nudgeExponent(1));
 $('expdown-btn').addEventListener('click', () => nudgeExponent(-1));
-
-// Rotating a phone crosses the breakpoint, and with it whether the bit strip is
-// interactive; re-render so the two never disagree.
-window.matchMedia('(max-width: 560px)').addEventListener('change', () => {
-  renderDecode();
-  renderBits();
-});
 
 $('prev-btn').addEventListener('click', () => step(-1));
 $('next-btn').addEventListener('click', () => step(+1));
